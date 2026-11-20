@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#1d1b18;--mute:#77716a;--acc:#d9480f;--ok:#2b8a3e;--line:#e6e1d8}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+  h2{margin:0 0 10px;font-size:15px;color:var(--mute);font-weight:600}
+  button{font:inherit;border:0;border-radius:12px;cursor:pointer;touch-action:manipulation}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  /* login */
+  #login{display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:12vh}
+  #pinShow{font-size:36px;letter-spacing:12px;height:44px}
+  .pad{display:grid;grid-template-columns:repeat(3,76px);gap:10px}
+  .pad button{height:64px;font-size:26px;background:var(--card);border:1px solid var(--line)}
+  /* qty */
+  .qty{display:flex;align-items:center;justify-content:center;gap:18px}
+  .qty button{width:64px;height:64px;font-size:32px;background:#eee8de}
+  .qty .v{font-size:52px;font-weight:800;min-width:70px;text-align:center}
+  .total{text-align:center;font-size:20px;margin:8px 0 12px}
+  .total b{font-size:32px;color:var(--acc)}
+  .quick{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
+  .quick button{height:60px;font-size:24px;font-weight:800;background:#fff;border:2px solid var(--acc);color:var(--acc)}
+  .quick button:active{background:var(--acc);color:#fff}
+  .clear{display:block;margin:6px auto 0;background:none;color:var(--mute);font-size:15px;padding:4px 10px}
+  .cash{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .cash button{height:56px;font-size:18px;background:#eee8de;font-weight:700}
+  .cash button.exact{background:var(--ok);color:#fff}
+  /* call */
+  .now{text-align:center}
+  .now .num{font-size:96px;font-weight:900;line-height:1;color:var(--acc)}
+  .now .sub{color:var(--mute);margin-top:6px}
+  .big{width:100%;height:72px;font-size:24px;font-weight:800;background:var(--acc);color:#fff;margin-top:12px}
+  .big:disabled{opacity:.35}
+  .row{display:flex;gap:8px;margin-top:8px}
+  .row input{flex:1;height:48px;font-size:20px;border:1px solid var(--line);border-radius:12px;padding:0 12px;min-width:0}
+  .row button{height:48px;padding:0 14px;background:#eee8de;font-weight:700}
+  .pick{margin-top:14px;text-align:left;border-top:1px solid var(--line);padding-top:12px}
+  .pick .t{font-size:14px;color:var(--mute);margin-bottom:8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:#fff3ea;border:2px solid var(--acc);color:var(--ink);padding:8px 12px;font-size:17px;font-weight:700;border-radius:12px;line-height:1.2}
+  .chip small{display:block;font-size:12px;font-weight:500;color:var(--mute)}
+  .chip.late{background:#ffe3e3;border-color:#c92a2a}
+  .chip.late small{color:#c92a2a}
+  .tag{font-size:12px;padding:2px 6px;border-radius:6px;background:#e6f4ea;color:var(--ok)}
+  .tag.no{background:#eee8de;color:var(--mute)}
+  .lineq{margin-bottom:14px}
+  .lineq h2{display:flex;justify-content:space-between}
+  .pend{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#eaf7ee;border:2px solid #06c755;padding:10px 12px;margin-top:8px}
+  .pend .code{font-size:24px;font-weight:900;color:#06a447;min-width:52px}
+  .pend .who{flex:1;font-size:16px;font-weight:700;line-height:1.3}
+  .pend .who small{display:block;font-weight:500;color:var(--mute);font-size:13px}
+  .pend .amt{font-size:20px;font-weight:800}
+  .pend.sel{background:#06c755;color:#fff}.pend.sel .code,.pend.sel small{color:#fff}
+  .selbar{display:none;background:#06c755;color:#fff;border-radius:12px;padding:10px 12px;margin:10px 0;font-weight:700;align-items:center;gap:8px}
+  .selbar button{margin-left:auto;background:#fff;color:#06a447;padding:6px 10px;font-size:14px}
+  .locked .qty button,.locked .quick button,.locked .clear{opacity:.3;pointer-events:none}
+  .lbadge{display:inline-block;background:#06c755;color:#fff;font-size:11px;padding:1px 5px;border-radius:5px;vertical-align:middle}
+  .sw{display:flex;align-items:center;justify-content:space-between;font-size:16px}
+  .sw input{width:26px;height:26px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}
+  .stats b{display:block;font-size:26px}
+  .stats span{color:var(--mute);font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  td{padding:7px 4px;border-top:1px solid var(--line)}
+  td.r{text-align:right}
+  .lnk{background:none;color:var(--acc);padding:0;font-size:14px}
+  /* modal */
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px}
+  #modal .box{background:#fff;border-radius:20px;padding:22px;text-align:center;width:100%;max-width:380px}
+  #modal .n{font-size:110px;font-weight:900;line-height:1;color:var(--acc)}
+  #qr{display:flex;justify-content:center;margin:12px 0}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none}
+  .muted{color:var(--mute);font-size:14px}
+  .toggle{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:15px}
+  .toggle input{width:22px;height:22px}
+  /* 收據（只在列印時出現） */
+  #receipt{display:none}
+  @media print{
+    @page{size:var(--paper,58mm) auto;margin:0}
+    body{background:#fff}
+    body > *:not(#receipt){display:none !important}
+    #receipt{display:block;width:var(--paper,58mm);padding:3mm 3mm 6mm;color:#000;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:12px}
+    #receipt .c{text-align:center}
+    #receipt .shop{font-size:15px;font-weight:700}
+    #receipt .no{font-size:56px;font-weight:900;line-height:1;margin:4px 0}
+    #receipt .hr{border-top:1px dashed #000;margin:6px 0}
+    #receipt table td{border:0;padding:1px 0;font-size:12px}
+    #receipt #rQr{display:flex;justify-content:center;margin:6px 0}
+    #receipt #rQr img{width:30mm;height:30mm}
+  }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div style="font-size:22px;font-weight:700">輸入 PIN</div>
+  <div id="pinShow"></div>
+  <div class="pad" id="pad"></div>
+  <div class="muted">登入後這台裝置會記住，下次自動進入</div>
+</div>
+
+<div id="app" class="wrap" style="display:none">
+  <div class="grid">
+    <div class="card" id="payCard">
+      <div class="lineq" id="lineq" style="display:none">
+        <h2><span>LINE 待付款（客人報付款碼）</span><span id="lineqN"></span></h2>
+        <div id="pendList"></div>
+      </div>
+      <div class="selbar" id="selbar"><span id="selText"></span><button onclick="clearSel()">取消選取</button><button onclick="if(sel&&confirm('取消 '+sel.code+' 這筆 LINE 訂單？')){const id=sel.id;clearSel();act('cancelPending',id)}" style="margin-left:0;background:#ffe3e3;color:#c92a2a">刪除訂單</button></div>
+      <h2>結帳出號 · <?= itemName ?> $<span class="priceV"><?= price ?></span></h2>
+      <div class="qty">
+        <button onclick="setQty(qty-1)">−</button>
+        <div class="v" id="qtyV">1</div>
+        <button onclick="setQty(qty+1)">＋</button>
+      </div>
+      <div class="quick">
+        <button onclick="addQty(1)">+1</button><button onclick="addQty(2)">+2</button><button onclick="addQty(3)">+3</button>
+        <button onclick="addQty(4)">+4</button><button onclick="addQty(5)">+5</button><button onclick="addQty(10)">+10</button>
+      </div>
+      <button class="clear" onclick="setQty(0)">歸零</button>
+      <div class="total">應收 <b id="amt">$0</b></div>
+      <div class="cash" id="cash"></div>
+      <div class="row">
+        <input id="paidIn" type="number" inputmode="numeric" placeholder="其他金額">
+        <button onclick="checkout(+paidIn.value)">收款</button>
+      </div>
+      <div class="toggle">
+        <label><input type="checkbox" id="autoPrint" onchange="store('pos_print',this.checked?'1':'0')"> 結帳後自動列印</label>
+        <select id="paper" onchange="store('pos_paper',this.value);setPaper()" style="margin-left:auto;height:34px;border-radius:8px">
+          <option value="58mm">58mm 紙</option>
+          <option value="80mm">80mm 紙</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card now">
+      <h2>叫號</h2>
+      <div class="num" id="called">0</div>
+      <div class="sub" id="waitInfo">目前無人等待</div>
+      <button class="big" id="nextBtn" onclick="act('callNext')">叫下一號</button>
+      <div class="row">
+        <button onclick="act('reRing')" style="flex:1">再提醒一次</button>
+      </div>
+      <div class="row">
+        <input id="jumpIn" type="number" inputmode="numeric" placeholder="跳到指定號碼">
+        <button onclick="act('callNumber', +jumpIn.value)">叫這號</button>
+      </div>
+      <div class="pick">
+        <div class="t">已叫號・還沒領 — 交給客人後點一下號碼</div>
+        <div class="chips" id="chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;padding:0 4px">
+    <button class="lnk" onclick="showQr(0)">顯示客人查詢 QR</button>
+    <button class="lnk" onclick="toggleAdmin(true)">後台 ›</button>
+  </div>
+</div>
+
+<!-- 後台：營收、最近訂單、作廢、登出 -->
+<div id="admin" class="wrap" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <button class="lnk" onclick="toggleAdmin(false)" style="font-size:17px">‹ 回到結帳</button>
+    <b>後台</b>
+    <button class="lnk" onclick="logout()">登出</button>
+  </div>
+  <div class="card">
+    <div class="stats">
+      <div><b id="sOrders">0</b><span>今日單數</span></div>
+      <div><b id="sQty">0</b><span>今日份數</span></div>
+      <div><b id="sRev">$0</b><span>今日營收</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>LINE 點餐</h2>
+    <label class="sw">開放客人用 LINE 點餐 <input type="checkbox" id="lineOpen" onchange="act('setLineOpen',this.checked)"></label>
+    <div class="muted" style="margin-top:8px" id="pushInfo"></div>
+    <div class="muted" id="lineRev"></div>
+  </div>
+  <div class="card">
+    <h2>商品單價</h2>
+    <div class="row">
+      <input id="priceIn" type="number" inputmode="numeric">
+      <button onclick="savePrice()">儲存</button>
+    </div>
+    <div class="muted" style="margin-top:6px">目前單價 $<span class="priceV"></span>，儲存後下一筆開始用新價格</div>
+  </div>
+  <div class="card">
+    <h2>最近訂單</h2>
+    <table id="recent"></table>
+  </div>
+</div>
+
+<div id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="box">
+    <div class="muted" id="mTitle">您的號碼</div>
+    <div class="n" id="mNum"></div>
+    <div id="mChange" style="font-size:20px;margin-top:8px"></div>
+    <div id="qr"></div>
+    <div class="muted">請客人掃描，在手機上看叫號進度</div>
+    <div class="row">
+      <button id="reprintBtn" onclick="printReceipt()" style="flex:1">🖨 列印 / 補印</button>
+    </div>
+    <button class="big" onclick="closeModal()">完成</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<div id="receipt">
+  <div class="c shop"><?= storeName ?></div>
+  <div class="c" id="rTime"></div>
+  <div class="hr"></div>
+  <div class="c">取餐號碼</div>
+  <div class="c no" id="rNo"></div>
+  <div class="hr"></div>
+  <table style="width:100%">
+    <tr><td id="rItem"></td><td style="text-align:right" id="rAmt"></td></tr>
+    <tr><td>收款</td><td style="text-align:right" id="rPaid"></td></tr>
+    <tr><td>找零</td><td style="text-align:right" id="rChange"></td></tr>
+  </table>
+  <div class="hr"></div>
+  <div class="c">掃描查看叫號進度</div>
+  <div id="rQr"></div>
+  <div class="c">謝謝光臨，請留意叫號</div>
+</div>
+
+<script>
+const BASE = <?!= JSON.stringify(url) ?>;
+let PRICE = <?!= price ?>;
+let pin = '', qty = 0, polling = null, busy = false, sel = null, lastState = null;
+
+function store(k,v){try{v===undefined?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}
+function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.style.display='block';clearTimeout(el._t);el._t=setTimeout(()=>el.style.display='none',2500)}
+
+function run(fn,...args){
+  return new Promise((res,rej)=>google.script.run.withSuccessHandler(res).withFailureHandler(e=>rej(e))[fn](...args));
+}
+
+/* ---- 登入 ---- */
+let typed='';
+(function buildPad(){
+  const pad=document.getElementById('pad');
+  ['1','2','3','4','5','6','7','8','9','清除','0','確定'].forEach(k=>{
+    const b=document.createElement('button');b.textContent=k;
+    if(k.length>1)b.style.fontSize='18px';
+    b.onclick=()=>{
+      if(k==='清除')typed='';
+      else if(k==='確定')tryLogin(typed);
+      else if(typed.length<8)typed+=k;
+      document.getElementById('pinShow').textContent='•'.repeat(typed.length);
+    };
+    pad.appendChild(b);
+  });
+})();
+
+async function tryLogin(p){
+  try{
+    const s=await run('staffState',p);
+    pin=p;store('pos_pin',p);
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='block';
+    render(s);
+    clearInterval(polling);polling=setInterval(refresh,5000);
+  }catch(e){
+    store('pos_pin');typed='';document.getElementById('pinShow').textContent='';
+    toast(e.message||'登入失敗');
+  }
+}
+function toggleAdmin(on){
+  document.getElementById('app').style.display=on?'none':'block';
+  document.getElementById('admin').style.display=on?'block':'none';
+  window.scrollTo(0,0);
+  if(on)refresh();
+}
+function logout(){store('pos_pin');location.reload()}
+
+/* ---- 結帳 ---- */
+function addQty(n){setQty(qty+n)}
+function setQty(v){
+  qty=Math.max(0,Math.min(999,v));
+  document.getElementById('qtyV').textContent=qty;
+  const amt=sel?sel.amount:qty*PRICE, opts=[amt];
+  document.getElementById('amt').textContent='$'+amt;
+  if(!qty){document.getElementById('cash').innerHTML='<div class="muted" style="grid-column:1/-1;text-align:center;padding:16px 0">請先選數量</div>';return;}
+  [100,200,500,1000].forEach(c=>{const v2=Math.ceil(amt/c)*c;if(v2>amt&&!opts.includes(v2))opts.push(v2)});
+  opts.sort((a,b)=>a-b);
+  const cash=document.getElementById('cash');cash.innerHTML='';
+  opts.slice(0,4).forEach((v2,i)=>{
+    const b=document.createElement('button');
+    b.textContent=i===0?'剛好 $'+v2:'$'+v2;
+    if(i===0)b.className='exact';
+    b.onclick=()=>checkout(v2);cash.appendChild(b);
+  });
+}
+
+async function checkout(paid){
+  if(busy)return;
+  const amt=sel?sel.amount:qty*PRICE;
+  if(!qty)return toast('請先選數量');
+  if(!paid||paid<amt)return toast('收款不足 $'+amt);
+  busy=true;
+  try{
+    const r=await run('newOrder',pin,qty,paid,PRICE,sel?sel.id:'');
+    lastOrder=r;
+    showQr(r.n, r);
+    if(document.getElementById('autoPrint').checked)printReceipt();
+    document.getElementById('paidIn').value='';
+    clearSel();refresh();
+  }catch(e){toast(e.message);clearSel();refresh();}
+  busy=false;
+}
+
+function showQr(n,o){
+  document.getElementById('mTitle').textContent=n?'您的號碼':'掃描查看目前叫號';
+  document.getElementById('mNum').textContent=n||'';
+  document.getElementById('mNum').style.display=n?'block':'none';
+  const mc=document.getElementById('mChange');
+  if(o){
+    mc.innerHTML=`<div class="muted">${o.qty} 份 · 應收 $${o.amount}</div>`+
+      `<div style="font-size:26px;font-weight:800;margin-top:4px">已收 $${o.paid.toLocaleString()}</div>`+
+      (o.change>0?`<div style="font-size:26px;font-weight:800;color:var(--ok)">找零 $${o.change.toLocaleString()}</div>`:'')+
+      `<div style="margin-top:6px">取餐碼 <b style="font-size:22px">${o.pickCode}</b></div>`+
+      (o.line?`<div style="color:#06a447;font-weight:700;margin-top:4px">✓ 號碼已顯示在 ${esc(o.name)} 的 LINE 取餐券</div>`:'');
+  }else mc.innerHTML='';
+  document.getElementById('reprintBtn').parentNode.style.display=n?'flex':'none';
+  const q=document.getElementById('qr');q.innerHTML='';
+  const link=n?BASE+'?n='+n:BASE;
+  if(window.QRCode)new QRCode(q,{text:link,width:200,height:200});
+  else q.textContent=link;
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){document.getElementById('modal').style.display='none'}
+
+/* ---- 列印收據 ---- */
+let lastOrder=null;
+function setPaper(){
+  document.documentElement.style.setProperty('--paper',document.getElementById('paper').value);
+}
+function printReceipt(){
+  const o=lastOrder;
+  if(!o)return toast('沒有可列印的訂單');
+  const $=id=>document.getElementById(id);
+  $('rTime').textContent=new Date().toLocaleString('zh-TW',{hour12:false});
+  $('rNo').textContent=o.n;
+  $('rItem').textContent=ITEM+' x'+o.qty;
+  $('rAmt').textContent='$'+o.amount;
+  $('rPaid').textContent='$'+o.paid;
+  $('rChange').textContent='$'+o.change;
+  const q=$('rQr');q.innerHTML='';
+  if(window.QRCode)new QRCode(q,{text:BASE+'?n='+o.n,width:160,height:160,correctLevel:QRCode.CorrectLevel.M});
+  setTimeout(()=>window.print(),350);   // 等 QR 圖產生
+}
+
+/* ---- 叫號 ---- */
+async function act(fn,...args){
+  if(busy)return;busy=true;
+  let ok=false;
+  try{render(await run(fn,pin,...args));document.getElementById('jumpIn').value='';ok=true;}
+  catch(e){toast(e.message);refresh();}
+  busy=false;return ok;
+}
+
+async function refresh(){
+  try{render(await run('staffState',pin))}catch(e){}
+}
+
+async function savePrice(){
+  const v=+document.getElementById('priceIn').value;
+  if(!(v>0))return toast('請輸入單價');
+  if(!confirm('單價改為 $'+v+'？'))return;
+  try{render(await run('setPrice',pin,v));toast('已改為 $'+v);}catch(e){toast(e.message)}
+}
+
+function esc(t){return String(t||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+/* ---- LINE 待付款 ---- */
+function renderPending(list){
+  const box=document.getElementById('pendList');
+  document.getElementById('lineq').style.display=list.length?'block':'none';
+  document.getElementById('lineqN').textContent=list.length?list.length+' 筆':'';
+  if(sel && !list.find(p=>p.id===sel.id)){clearSel();toast('這筆 LINE 訂單已逾時或取消');}
+  box.innerHTML='';
+  list.forEach(p=>{
+    const b=document.createElement('button');
+    b.className='pend'+(sel&&sel.id===p.id?' sel':'');
+    b.innerHTML=`<span class="code">${p.code}</span><span class="who">${esc(p.name)}<small>${p.qty} 份 · 剩 ${p.left} 分鐘</small></span><span class="amt">$${p.amount}</span>`;
+    b.onclick=()=>selectPending(p);
+    box.appendChild(b);
+  });
+}
+function selectPending(p){
+  sel=p;
+  document.getElementById('payCard').classList.add('locked');
+  const bar=document.getElementById('selbar');bar.style.display='flex';
+  document.getElementById('selText').textContent=`收款：${p.code} ${p.name}（${p.qty} 份）`;
+  setQty(p.qty);
+  if(lastState)renderPending(lastState.pendingLine||[]);
+}
+function clearSel(){
+  sel=null;
+  document.getElementById('payCard').classList.remove('locked');
+  document.getElementById('selbar').style.display='none';
+  setQty(0);
+  if(lastState)renderPending(lastState.pendingLine||[]);
+}
+
+const LATE_MIN = 5;   // 叫號超過幾分鐘沒領，標紅色
+function minsSince(hms){
+  if(!hms)return null;
+  const [h,m,sec]=hms.split(':').map(Number), now=new Date();
+  const t=new Date(now);t.setHours(h,m,sec||0,0);
+  return Math.max(0,Math.floor((now-t)/60000));
+}
+function renderChips(list){
+  const box=document.getElementById('chips');box.innerHTML='';
+  if(!list.length){box.innerHTML='<span class="muted">都領走了 👍</span>';return;}
+  list.forEach(o=>{
+    const m=minsSince(o.calledAt), b=document.createElement('button');
+    b.className='chip'+(m!==null&&m>=LATE_MIN?' late':'');
+    b.innerHTML=`#${o.n}<small>${o.qty} 份 · 碼 ${o.pickCode||'-'}${o.name?' · '+esc(o.name):''}${m!==null?' · '+(m?m+' 分前叫':'剛叫'):''}</small>`;
+    b.onclick=()=>{
+      if(!confirm(`交貨確認\n\n#${o.n}　${o.qty} 份　取餐碼 ${o.pickCode||'-'}${o.name?'\nLINE：'+o.name:''}\n\n核對無誤後按「確定」`))return;
+      act('setPicked',o.n,true).then(ok=>{if(ok)toast(o.n+' 號已領取')});
+    };
+    box.appendChild(b);
+  });
+}
+
+function render(s){
+  if(s.price && s.price!==PRICE){PRICE=s.price;setQty(qty);}
+  document.querySelectorAll('.priceV').forEach(el=>el.textContent=PRICE);
+  const pi=document.getElementById('priceIn');if(document.activeElement!==pi)pi.value=PRICE;
+  document.getElementById('called').textContent=s.called;
+  const wait=s.last-s.called;
+  document.getElementById('waitInfo').textContent=wait>0?`等待中 ${wait} 組（最後一號 ${s.last}）`:'目前無人等待';
+  document.getElementById('nextBtn').disabled=wait<=0;
+  document.getElementById('sOrders').textContent=s.orders;
+  document.getElementById('sQty').textContent=s.qty;
+  document.getElementById('sRev').textContent='$'+s.revenue.toLocaleString();
+  lastState=s;
+  renderChips(s.waitingPickup||[]);
+  renderPending(s.pendingLine||[]);
+  const lo=document.getElementById('lineOpen');lo.checked=s.lineOpen;
+  document.getElementById('pushInfo').textContent=s.lineReady
+    ?`本月已發 LINE 通知 ${s.pushCount} / ${s.maxPush} 則（到上限會自動停發）`
+    :'⚠️ 尚未設定 LINE（LINE_TOKEN、LINE_LOGIN_CHANNEL_ID），客人無法用 LINE 點餐';
+  document.getElementById('lineRev').textContent=`今日 LINE 訂單營收 $${(s.lineRevenue||0).toLocaleString()}`;
+  const t=document.getElementById('recent');
+  t.innerHTML=s.recent.length?'':'<tr><td class="muted">今天還沒有訂單</td></tr>';
+  s.recent.forEach(o=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><b>#${o.n}</b>${o.line?' <span class="lbadge">LINE</span>':''}</td><td>${o.qty} 份</td><td class="r">$${o.amount}</td><td class="r muted">${o.time}</td>`+
+      `<td class="r">${o.picked?`<span class="tag">已領 ${o.pickedAt.slice(0,5)}</span>`:'<span class="tag no">未領</span>'}</td>`+
+      `<td class="r"><button class="lnk pk">${o.picked?'改回未領':'標記已領'}</button> <button class="lnk vd">作廢</button></td>`;
+    tr.querySelector('.pk').onclick=()=>act('setPicked',o.n,!o.picked);
+    tr.querySelector('.vd').onclick=()=>{if(confirm(`確定作廢 ${o.n} 號？`))act('voidOrder',o.n)};
+    t.appendChild(tr);
+  });
+}
+
+const ITEM = <?!= JSON.stringify(itemName) ?>;
+document.getElementById('autoPrint').checked = load('pos_print')==='1';
+document.getElementById('paper').value = load('pos_paper')||'58mm';
+setPaper();
+setQty(0);
+const saved=load('pos_pin');if(saved)tryLogin(saved);
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<style>
+  :root{--bg:#f6f4ef;--ink:#1d1b18;--mute:#77716a;--acc:#d9480f;--ok:#2b8a3e;--line:#e6e1d8}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;text-align:center}
+  .wrap{max-width:480px;margin:0 auto;padding:28px 16px}
+  .lbl{color:var(--mute);font-size:16px}
+  .now{font-size:120px;font-weight:900;line-height:1.05;color:var(--acc);margin:6px 0 20px}
+  .mine{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px}
+  .mine .n{font-size:56px;font-weight:800}
+  .msg{font-size:20px;margin-top:6px}
+  .ready{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .ready .lbl{color:#e6f4ea}
+  .row{display:flex;gap:8px;margin-top:10px}
+  input{flex:1;height:50px;font-size:20px;border:1px solid var(--line);border-radius:12px;padding:0 12px;min-width:0}
+  button{height:50px;padding:0 18px;border:0;border-radius:12px;background:var(--acc);color:#fff;font-size:18px;font-weight:700}
+  .foot{color:var(--mute);font-size:13px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lbl">目前叫號</div>
+  <div class="now" id="now">–</div>
+
+  <div class="mine" id="mine" style="display:none">
+    <div class="lbl">您的號碼</div>
+    <div class="n" id="myN"></div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div id="ask">
+    <div class="lbl">輸入您的號碼，輪到時會提醒您</div>
+    <div class="row">
+      <input id="nIn" type="number" inputmode="numeric" placeholder="例如 12">
+      <button onclick="setMine(+nIn.value)">追蹤</button>
+    </div>
+  </div>
+
+  <div class="foot" id="foot">每 5 秒自動更新</div>
+</div>
+
+<script>
+let myN = +(<?!= JSON.stringify(n) ?>) || 0;
+let lastRing = null, alerted = false;
+
+function setMine(n){
+  if(!n)return;
+  myN=n;alerted=false;
+  document.getElementById('ask').style.display='none';
+  tick();
+}
+
+function tick(){
+  google.script.run.withSuccessHandler(s=>{
+    document.getElementById('now').textContent=s.called||'–';
+    const mine=document.getElementById('mine');
+    if(myN){
+      document.getElementById('ask').style.display='none';
+      mine.style.display='block';
+      document.getElementById('myN').textContent=myN;
+      const ahead=myN-s.called;
+      let m;
+      if(myN>s.last && s.last>0) m='查無此號碼（今日最後一號是 '+s.last+'）';
+      else if(ahead<=0){
+        m=ahead===0?'輪到您了！請至櫃台取餐 🎉':'您的號碼已叫過，請至櫃台';
+        mine.classList.add('ready');
+        // 輪到時 / 店員再提醒時震動
+        if(!alerted || (lastRing!==null && s.ring!==lastRing && ahead===0)){
+          if(navigator.vibrate)navigator.vibrate([300,150,300,150,300]);
+          alerted=true;
+        }
+      }else{
+        m='前面還有 '+ahead+' 組';
+        mine.classList.remove('ready');
+      }
+      document.getElementById('msg').textContent=m;
+    }
+    lastRing=s.ring;
+    document.getElementById('foot').textContent='每 5 秒自動更新 · '+new Date().toLocaleTimeString('zh-TW');
+  }).withFailureHandler(()=>{
+    document.getElementById('foot').textContent='連線中斷，重試中…';
+  }).getStatus();
+}
+
+if(myN)document.getElementById('ask').style.display='none';
+tick();
+setInterval(tick,5000);
+</script>
+</body>
+</html>
