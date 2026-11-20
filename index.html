@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>LINE 點餐取號</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{--bg:#f6f4ef;--card:#fff;--ink:#1d1b18;--mute:#77716a;--acc:#d9480f;--line:#06c755;--bd:#e6e1d8}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+  .wrap{max-width:460px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:18px;margin-bottom:14px;text-align:center}
+  button{font:inherit;border:0;border-radius:14px;cursor:pointer;touch-action:manipulation}
+  .me{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .me img{width:40px;height:40px;border-radius:50%;background:#ddd;object-fit:cover}
+  .me b{font-size:17px}
+  .muted{color:var(--mute);font-size:14px}
+  .qty{display:flex;align-items:center;justify-content:center;gap:16px;margin:8px 0}
+  .qty button{width:56px;height:56px;font-size:28px;background:#eee8de}
+  .qty .v{font-size:48px;font-weight:800;min-width:64px}
+  .quick{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
+  .quick button{height:50px;font-size:20px;font-weight:800;background:#fff;border:2px solid var(--acc);color:var(--acc)}
+  .total{font-size:20px;margin:10px 0}.total b{font-size:30px;color:var(--acc)}
+  .main{width:100%;height:60px;font-size:22px;font-weight:800;background:var(--line);color:#fff;margin-top:8px}
+  .main:disabled{opacity:.35}
+  .ghost{background:none;color:var(--mute);font-size:15px;margin-top:10px;padding:8px}
+  .big{font-size:96px;font-weight:900;line-height:1;margin:6px 0}
+  .ticket{position:relative;overflow:hidden;border:3px solid var(--acc)}
+  .ticket.call{border-color:var(--line);background:#eaf7ee}
+  .ticket.done{border-color:#bbb;background:#f1f1f1;color:#999}
+  .ticket.done .big{text-decoration:line-through}
+  .live{height:8px;border-radius:4px;margin:12px 0 6px;background:repeating-linear-gradient(90deg,var(--acc) 0 14px,#ffd8c2 14px 28px);background-size:56px 8px;animation:mv 1s linear infinite}
+  .call .live{background:repeating-linear-gradient(90deg,var(--line) 0 14px,#bdf0d1 14px 28px);background-size:56px 8px}
+  .done .live{animation:none;background:#ccc}
+  @keyframes mv{to{background-position:56px 0}}
+  .clock{font-variant-numeric:tabular-nums;font-size:15px;color:var(--mute)}
+  .row{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--bd);font-size:16px}
+  .pcode{font-size:72px;font-weight:900;color:#06a447;letter-spacing:2px;line-height:1.1}
+  .friend{background:#fff8e6;border:1px solid #f0d58a;border-radius:14px;padding:12px;margin-bottom:14px;font-size:15px;text-align:center}
+  .friend a{display:inline-block;margin-top:8px;background:var(--line);color:#fff;text-decoration:none;padding:10px 18px;border-radius:12px;font-weight:700}
+  #err{color:#c92a2a;min-height:20px;margin-top:8px}
+  .status{font-size:22px;font-weight:800;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="me" id="me" style="display:none"><img id="pic" alt=""><div><b id="name"></b><div class="muted" id="store"></div></div></div>
+  <div id="friend" class="friend" style="display:none">
+    加入官方帳號好友，叫號時才收得到 LINE 通知<br>
+    <a id="friendLink" href="#">加入好友</a>
+  </div>
+  <div id="view"><div class="card"><div class="muted">載入中…</div></div></div>
+  <div id="err"></div>
+</div>
+
+<script>
+/******** 請修改這三個設定 ********/
+const LIFF_ID = '2012714758-NLJ8ntTz';   // LINE Developers > LIFF 的 LIFF ID
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwM9Smt8SRDNLm4SoPcpYGJi1ChYEfUBiOp6kOHXug5wPVYIDMbDOq4WTEnJaMESyT1/exec';   // POS 系統網址（結尾 /exec）
+const OA_ID   = '@397vimcr';             // 官方帳號 ID（含 @），用來顯示「加入好友」
+/*********************************/
+
+let sess = null, st = null, qty = 0, timer = null, lastRing = null, alerted = false;
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function api(action, extra) {
+  const r = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action, sess }, extra || {})) });
+  const j = await r.json();
+  if (!j.ok) {
+    if (j.relogin && action !== 'login') { sess = null; await login(); return api(action, extra); }
+    throw new Error(j.error);
+  }
+  return j.data;
+}
+
+async function login() {
+  const idToken = liff.getIDToken();
+  if (!idToken) { liff.login({ redirectUri: location.href }); throw new Error('登入中…'); }
+  const d = await api('login', { idToken });
+  sess = d.sess;
+  if (d.pic) $('pic').src = d.pic; else $('pic').style.display = 'none'; $('name').textContent = d.name; $('store').textContent = d.store;
+  $('me').style.display = 'flex';
+  return d;
+}
+
+async function start() {
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+    render(await login());
+    try {
+      const f = await liff.getFriendship();
+      if (!f.friendFlag) { $('friendLink').href = 'https://line.me/R/ti/p/' + encodeURIComponent(OA_ID); $('friend').style.display = 'block'; }
+    } catch (e) {}
+    timer = setInterval(poll, 5000);
+    setInterval(tickClock, 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+  } catch (e) { showErr(e.message || '無法開啟，請在 LINE 裡打開'); }
+}
+
+async function poll() {
+  if (document.hidden || !sess) return;
+  try { render(await api('state')); } catch (e) {}
+}
+
+function showErr(t) { $('err').textContent = t || ''; }
+
+function tickClock() {
+  const el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+  const cd = document.getElementById('countdown');
+  if (cd && st && st.ticket && st.ticket.expiresAt) {
+    const s = Math.max(0, Math.floor((st.ticket.expiresAt - Date.now()) / 1000));
+    cd.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+}
+
+function render(d) {
+  st = d; showErr('');
+  const t = d.ticket, v = $('view');
+
+  if (t && t.stage === 'pay') {
+    v.innerHTML = `<div class="card">
+      <div class="muted">請到櫃台告訴店員付款碼</div>
+      <div class="pcode">${esc(t.code)}</div>
+      <div class="total">應付 <b>$${t.amount}</b>（${t.qty} 份）</div>
+      <div class="muted">請在 <b>${esc(t.expiresHm)}</b> 前付款，剩 <b id="countdown"></b>，逾時自動取消</div>
+      <div class="live"></div><div class="clock" id="clock"></div>
+      <button class="ghost" onclick="cancelOrder()">取消訂單</button></div>`;
+  } else if (t && (t.stage === 'wait' || t.stage === 'call' || t.stage === 'done')) {
+    const cls = t.stage === 'call' ? 'call' : t.stage === 'done' ? 'done' : '';
+    const msg = t.stage === 'wait' ? (t.ahead > 0 ? `前面還有 ${t.ahead} 組` : '下一個就是您！')
+              : t.stage === 'call' ? '🔔 輪到您了！請到櫃台出示此畫面取餐'
+              : `已於 ${esc(t.pickedAt)} 領取，此券已失效`;
+    v.innerHTML = `<div class="card ticket ${cls}">
+      <div class="muted">取餐券</div>
+      <div class="big">${t.n}</div>
+      <div class="status">${msg}</div>
+      <div class="live"></div><div class="clock" id="clock"></div>
+      <div class="row"><span>${esc(d.item)}</span><span>${t.qty} 份</span></div>
+      <div class="row"><span>已付</span><span>$${t.amount}</span></div>
+      <div class="row"><span>取餐碼</span><b>${esc(t.pickCode)}</b></div>
+      <div class="muted" style="margin-top:8px">${t.stage === 'done' ? '' : '目前叫號：' + d.called + '　｜　截圖無效，請出示即時畫面'}</div>
+    </div>` + (t.stage === 'done' ? orderForm(d, true) : '');
+    if (t.stage === 'call') {
+      if (!alerted || (lastRing !== null && t.ring !== lastRing)) { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); alerted = true; }
+      lastRing = t.ring;
+    }
+  } else {
+    v.innerHTML = (t && t.stage === 'expired'
+      ? `<div class="card"><div class="muted">付款碼 ${esc(t.code)} ${t.reason === '取消' ? '已取消' : '已逾時取消'}</div></div>` : '')
+      + orderForm(d, false);
+  }
+  if (document.getElementById('qtyV')) setQty(qty);
+  tickClock();
+}
+
+function orderForm(d, again) {
+  if (!d.open) return `<div class="card"><div class="status">目前暫停 LINE 點餐</div><div class="muted">請直接到櫃台點餐</div></div>`;
+  return `<div class="card">
+    <div class="muted">${again ? '再點一份' : '點餐'} · ${esc(d.item)} $${d.price}</div>
+    <div class="qty"><button onclick="setQty(qty-1)">−</button><div class="v" id="qtyV">0</div><button onclick="setQty(qty+1)">＋</button></div>
+    <div class="quick"><button onclick="setQty(qty+1)">+1</button><button onclick="setQty(qty+2)">+2</button><button onclick="setQty(qty+3)">+3</button><button onclick="setQty(qty+5)">+5</button><button onclick="setQty(qty+10)">+10</button></div>
+    <div class="total">合計 <b id="tot">$0</b></div>
+    <button class="main" id="go" onclick="placeOrder()" disabled>送出訂單，到櫃台付款</button>
+    <div class="muted" style="margin-top:8px">送出後請在 ${d.payMinutes} 分鐘內到櫃台付款</div></div>`;
+}
+
+function setQty(n) {
+  qty = Math.max(0, Math.min(50, n));
+  if (!$('qtyV')) return;
+  $('qtyV').textContent = qty;
+  $('tot').textContent = '$' + qty * st.price;
+  $('go').disabled = !qty;
+}
+
+async function placeOrder() {
+  if (!qty) return;
+  $('go').disabled = true;
+  try { render(await api('order', { qty, price: st.price })); qty = 0; }
+  catch (e) { showErr(e.message); poll(); }
+}
+
+async function cancelOrder() {
+  if (!confirm('確定取消這筆訂單？')) return;
+  try { render(await api('cancel')); } catch (e) { showErr(e.message); }
+}
+
+start();
+</script>
+</body>
+</html>
